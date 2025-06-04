@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Админ-панель</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+        }
+        .admin-panel {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"], textarea, input[type="file"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        textarea {
+            height: 100px;
+            resize: vertical;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        .records-list {
+            margin-top: 30px;
+        }
+        .record {
+            background-color: #f9f9f9;
+            border-left: 4px solid #3498db;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+        .record h3 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+        .record p {
+            margin-bottom: 10px;
+        }
+        .record .gallery {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .record .gallery img {
+            max-width: 150px;
+            max-height: 150px;
+            border-radius: 4px;
+            object-fit: cover;
+        }
+        .delete-btn {
+            background-color: #e74c3c;
+            margin-top: 10px;
+        }
+        .delete-btn:hover {
+            background-color: #c0392b;
+        }
+        .preview-container {
+            margin-top: 15px;
+        }
+        .preview-gallery {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .preview-item {
+            position: relative;
+            width: 100px;
+            height: 100px;
+        }
+        .preview-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 4px;
+        }
+        .remove-preview-btn {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background-color: rgba(231, 76, 60, 0.8);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 10px;
+            cursor: pointer;
+        }
+        .remove-preview-btn:hover {
+            background-color: rgba(192, 57, 43, 0.9);
+        }
+        .image-counter {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        .error-message {
+            color: #e74c3c;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-panel">
+        <h1>Админ-панель</h1>
+        <a href="style.html" class="logout-btn">Выйти</a>
+        
+        <div class="add-record">
+            <h2>Добавить новую запись</h2>
+            <form id="recordForm">
+                <div class="form-group">
+                    <label for="title">Заголовок:</label>
+                    <input type="text" id="title" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="content">Содержание:</label>
+                    <textarea id="content"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="images">Изображения:</label>
+                    <input type="file" id="images" accept="image/*" multiple>
+                    <div class="image-counter" id="imageCounter">Выбрано файлов: 0/10</div>
+                    <div class="error-message" id="imageError"></div>
+                    <div class="preview-container">
+                        <div class="preview-gallery" id="previewGallery"></div>
+                    </div>
+                </div>
+                
+                <button type="submit">Добавить запись</button>
+            </form>
+        </div>
+        
+        <div class="records-list">
+            <h2>Список записей</h2>
+            <div id="recordsContainer"></div>
+        </div>
+    </div>
+
+    <script>
+        // Массив для хранения записей
+        let records = [];
+        let selectedImages = [];
+        
+        // Элементы DOM
+        const recordForm = document.getElementById('recordForm');
+        const recordsContainer = document.getElementById('recordsContainer');
+        const titleInput = document.getElementById('title');
+        const contentInput = document.getElementById('content');
+        const imagesInput = document.getElementById('images');
+        const previewGallery = document.getElementById('previewGallery');
+        const imageCounter = document.getElementById('imageCounter');
+        const imageError = document.getElementById('imageError');
+        
+        // Обработчик выбора изображений
+        imagesInput.addEventListener('change', function(e) {
+            imageError.textContent = '';
+            const files = Array.from(e.target.files);
+            
+            // Проверка количества файлов
+            if (files.length > 10) {
+                imageError.textContent = 'Можно загрузить не более 10 изображений';
+                imagesInput.value = '';
+                return;
+            }
+            
+
+            
+            // Обрабатываем каждый файл
+            files.forEach((file, index) => {
+                if (file.type.startsWith('image/')) {
+                    selectedImages.push(file);
+                    
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        const previewItem = document.createElement('div');
+                        previewItem.className = 'preview-item';
+                        previewItem.innerHTML = `
+                            <img src="${event.target.result}" alt="Превью ${index + 1}">
+                            <button type="button" class="remove-preview-btn" data-index="${index}">×</button>
+                        `;
+                        previewGallery.appendChild(previewItem);
+                        
+                        // Добавляем обработчик для кнопки удаления
+                        previewItem.querySelector('.remove-preview-btn').addEventListener('click', function() {
+                            removeImage(index);
+                        });
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+            
+            updateImageCounter();
+        });
+        
+        // Функция для удаления изображения из превью
+        function removeImage(index) {
+            selectedImages.splice(index, 1);
+            renderPreviews();
+            // Создаем новый input file, чтобы можно было повторно выбрать те же файлы
+            imagesInput.value = '';
+        }
+        
+        // Функция для обновления превью
+        function renderPreviews() {
+            previewGallery.innerHTML = '';
+            selectedImages.forEach((file, index) => {
+                const previewItem = document.createElement('div');
+                previewItem.className = 'preview-item';
+                previewItem.innerHTML = `
+                    <img src="${URL.createObjectURL(file)}" alt="Превью ${index + 1}">
+                    <button type="button" class="remove-preview-btn" data-index="${index}">×</button>
+                `;
+                previewGallery.appendChild(previewItem);
+                
+                // Добавляем обработчик для кнопки удаления
+                previewItem.querySelector('.remove-preview-btn').addEventListener('click', function() {
+                    removeImage(index);
+                });
+            });
+            
+            updateImageCounter();
+        }
+        
+        // Функция для обновления счетчика изображений
+        function updateImageCounter() {
+            imageCounter.textContent = `Выбрано файлов: ${selectedImages.length}/10`;
+        }
+        
+        // Загрузка записей при загрузке страницы
+        document.addEventListener('DOMContentLoaded', () => {
+            loadRecords();
+        });
+        
+        // Обработка отправки формы
+        recordForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // Проверяем количество изображений
+            if (selectedImages.length > 10) {
+                imageError.textContent = 'Можно загрузить не более 10 изображений';
+                return;
+            }
+            
+            // Конвертируем изображения в base64
+            const imagePromises = selectedImages.map(file => convertImageToBase64(file));
+            const imagesBase64 = await Promise.all(imagePromises);
+            
+            // Создаем новую запись
+            const newRecord = {
+                id: Date.now(), // Используем timestamp как ID
+                title: titleInput.value,
+                content: contentInput.value || null, // Необязательное поле
+                images: imagesBase64,
+                date: new Date().toLocaleString()
+            };
+            
+            // Добавляем запись и обновляем интерфейс
+            records.push(newRecord);
+            saveRecords();
+            renderRecords();
+            
+            // Очищаем форму
+            titleInput.value = '';
+            contentInput.value = '';
+            imagesInput.value = '';
+            selectedImages = [];
+            previewGallery.innerHTML = '';
+            updateImageCounter();
+            imageError.textContent = '';
+            
+            // Сбрасываем форму полностью
+            recordForm.reset();
+        });
+        
+        // Функция для конвертации изображения в base64
+        function convertImageToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = error => reject(error);
+                reader.readAsDataURL(file);
+            });
+        }
+        
+        // Функция для сохранения записей в localStorage
+        function saveRecords() {
+            localStorage.setItem('adminRecords', JSON.stringify(records));
+        }
+        
+        // Функция для загрузки записей из localStorage
+        function loadRecords() {
+            const savedRecords = localStorage.getItem('adminRecords');
+            if (savedRecords) {
+                records = JSON.parse(savedRecords);
+                renderRecords();
+            }
+        }
+        
+        // Функция для отображения записей
+        function renderRecords() {
+            recordsContainer.innerHTML = '';
+            
+            if (records.length === 0) {
+                recordsContainer.innerHTML = '<p>Нет записей</p>';
+                return;
+            }
+            
+            records.forEach(record => {
+                const recordElement = document.createElement('div');
+                recordElement.className = 'record';
+                
+                let contentHtml = '';
+                if (record.content) {
+                    contentHtml = `<p>${record.content}</p>`;
+                }
+                
+                let galleryHtml = '';
+                if (record.images && record.images.length > 0) {
+                    galleryHtml = '<div class="gallery">';
+                    record.images.forEach(image => {
+                        galleryHtml += `<img src="${image}" alt="Изображение">`;
+                    });
+                    galleryHtml += '</div>';
+                }
+                
+                recordElement.innerHTML = `
+                    <h3>${record.title}</h3>
+                    <p><small>${record.date}</small></p>
+                    ${contentHtml}
+                    ${galleryHtml}
+                    <button class="delete-btn" data-id="${record.id}">Удалить</button>
+                `;
+                recordsContainer.appendChild(recordElement);
+            });
+            
+            // Добавляем обработчики для кнопок удаления
+            document.querySelectorAll('.delete-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const id = parseInt(e.target.getAttribute('data-id'));
+                    deleteRecord(id);
+                });
+            });
+        }
+        
+        // Функция для удаления записи
+        function deleteRecord(id) {
+            records = records.filter(record => record.id !== id);
+            saveRecords();
+            renderRecords();
+        }
+    </script>
+</body>
+</html>
